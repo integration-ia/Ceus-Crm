@@ -1,0 +1,380 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum SubscriptionTierEnum {
+  BASIC
+  PREMIUM
+}
+
+model User {
+  id               String               @id @default(cuid())
+  firstName        String?
+  lastName         String?
+  email            String               @unique
+  phoneNumber      String?              @unique
+  countryCode      String?
+  showInWebsite    Boolean              @default(false)
+  isAdmin          Boolean              @default(false)
+  password         String?
+  image            String?
+  subscriptionTier SubscriptionTierEnum
+  organization     Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId   String
+  accounts         Account[]
+  sessions         Session[]
+  properties       Property[]
+  PropertyNote     PropertyNote[]
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  permissions      UserPermission[]
+  clientsCreated   Client[]
+  ClientNotes      ClientNote[]
+}
+
+enum UserPermissionTypeEnum {
+  CAN_CREATE_PROPERTIES
+  CAN_CREATE_CLIENTS
+  FULL_CLIENT_ACCESS
+  FULL_PROPERTY_ACCESS
+  CAN_SEE_GLOBAL_STATS
+  CAN_EXPORT_CLIENTS
+  CAN_DELETE_CLIENTS
+  CAN_DELETE_PROPERTIES
+  CAN_ASSIGN_PROPERTIES
+}
+
+model UserPermission {
+  id         String                 @id @default(cuid())
+  user       User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  permission UserPermissionTypeEnum
+  isEnabled  Boolean                @default(false)
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+}
+
+enum OrganizationWebsiteThemeEnum {
+  VIXEN
+  OCEAN
+}
+
+model Organization {
+  id                    String                        @id @default(cuid())
+  name                  String?
+  address               String?
+  logo                  String?
+  countryCode           String?
+  customDomain          String?                       @unique
+  generatedDomain       String?                       @unique
+  websiteTheme          OrganizationWebsiteThemeEnum  @default(VIXEN) // TODO: ask after finishing the design of the themes
+  createdAt             DateTime                      @default(now())
+  updatedAt             DateTime                      @updatedAt
+  phoneNumbers          OrganizationPhone[]
+  emails                OrganizationEmail[]
+  users                 User[]
+  properties            Property[]
+  clients               Client[]
+  organizationValues    OrganizationValues[]
+  organizationAboutInfo OrganizationAboutInfo?
+  socialMediaLinks      OrganizationSocialMediaLink[]
+  seoConfiguration      OrganizationSEOConfiguration?
+}
+
+enum OrganizationSocialMediaPlatformEnum {
+  FACEBOOK
+  INSTAGRAM
+  X
+  TIK_TOK
+}
+
+model OrganizationSocialMediaLink {
+  id             String                              @id @default(cuid())
+  organization   Organization                        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  platform       OrganizationSocialMediaPlatformEnum
+  link           String
+}
+
+model OrganizationValues {
+  id             String       @id @default(cuid())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  title          String
+  value          String
+}
+
+model OrganizationAboutInfo {
+  id             String       @id @default(cuid())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  organizationId String       @unique
+  aboutText      String
+  missionText    String
+  visionText     String
+}
+
+model OrganizationSEOConfiguration {
+  id             String       @id @default(cuid())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String       @unique
+  title          String?
+  description    String?
+  keywords       String?
+}
+
+model OrganizationPhone {
+  id             String        @id @default(cuid())
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  phoneNumber    String
+  type           PhoneTypeEnum
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model OrganizationEmail {
+  id             String       @id @default(cuid())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  email          String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+}
+
+enum PropertyTypeEnum {
+  HOME
+  APARTMENT
+  LOCAL
+  OFFICE
+  WAREHOUSE
+  TERRAIN
+  LOT
+  BUILDING
+  ESTATE
+  CHALET
+  HOTEL
+  LODGING_HOUSE
+  PRIVATE_ROOM
+  ATTIC
+  BUNGALOW
+  BEACH_HOUSE
+  GARAGE
+  CABIN
+  PENTHOUSE
+  STUDIO
+  LOFT
+  TOWNHOUSE
+}
+
+enum PublicationStatusEnum {
+  ACTIVE
+  FEATURED
+  INACTIVE
+}
+
+enum PhysicalStatusEnum {
+  IN_CONSTRUCTION
+  NEW
+  IN_PROJECT
+}
+
+enum ListingTypeEnum {
+  SALE
+  RENT
+  SALE_RENT
+  PERMUTATION_SALE
+  PERMUTATION_RENT
+}
+
+enum BuiltAreaSizeUnitsEnum {
+  SQUARE_METERS
+  SQUARE_YARDS
+}
+
+enum RentTimeEnum {
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+model Property {
+  id                        String                 @id @default(cuid())
+  crmCode                   BigInt                 @unique @default(autoincrement())
+  clicks                    Int                    @default(0)
+  title                     String
+  slug                      String                 @unique
+  propertyType              PropertyTypeEnum
+  publicationStatus         PublicationStatusEnum
+  constructionYear          Int?
+  physicalStatus            PhysicalStatusEnum
+  agentInChargeId           String                 @map("agentInCharge")
+  agentInCharge             User                   @relation(fields: [agentInChargeId], references: [id])
+  listingType               ListingTypeEnum
+  countryCode               String
+  regionCode                String?
+  cityName                  String?
+  zone                      Int? // Exclusive to Guatemala
+  address                   String
+  addressLatitude           Float?
+  addressLongitude          Float?
+  rentPriceCents            BigInt?
+  rentTime                  RentTimeEnum?
+  salePriceCents            BigInt?
+  serviceFeePercentage      Float?
+  uniqueTaxForPropertyCents BigInt?
+  bathrooms                 Int                    @db.SmallInt
+  bedrooms                  Int                    @db.SmallInt
+  parkingSpaces             Int                    @db.SmallInt
+  floorNumber               Int                    @db.SmallInt
+  builtAreaSize             Float?
+  builtAreaSizeUnit         BuiltAreaSizeUnitsEnum
+  totalAreaSize             Float?
+  totalAreaSizeUnit         BuiltAreaSizeUnitsEnum
+  description               String                 @db.Text
+  propertyNotes             PropertyNote[]
+  owner                     Client?                @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId                   String?
+  organization              Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId            String
+  createdAt                 DateTime               @default(now())
+  updatedAt                 DateTime               @updatedAt
+  propertyPhotos            PropertyPhoto[]
+  propertyVideos            PropertyVideo[]
+}
+
+model PropertyPhoto {
+  id           String   @id @default(cuid())
+  property     Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  isCoverPhoto Boolean  @default(false)
+  propertyId   String
+  cloudflareId String
+  filename     String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+enum VideoPlatformEnum {
+  YOUTUBE
+}
+
+model PropertyVideo {
+  id         String            @id @default(cuid())
+  propertyId String
+  property   Property          @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  videoUrl   String
+  platform   VideoPlatformEnum
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+}
+
+enum PhoneTypeEnum {
+  HOME
+  MOBILE
+}
+
+model PropertyNote {
+  id         String   @id @default(cuid())
+  propertyId String
+  authorId   String
+  content    String   @db.Text
+  author     User     @relation(fields: [authorId], references: [id])
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  property   Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+}
+
+enum ClientTypeEnum {
+  OWNER
+  BUYER
+  RENTER
+}
+
+model Client {
+  id              String         @id @default(cuid())
+  firstName       String
+  lastName        String
+  address         String?
+  createdByUserId String
+  createdByUser   User           @relation(fields: [createdByUserId], references: [id])
+  type            ClientTypeEnum
+  countryCode     String
+  emails          ClientEmail[]
+  phoneNumbers    ClientPhone[]
+  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId  String
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  properties      Property[]
+  clientNotes     ClientNote[]
+}
+
+model ClientNote {
+  id        String   @id @default(cuid())
+  clientId  String
+  authorId  String
+  content   String   @db.Text
+  author    User     @relation(fields: [authorId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  client    Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
+
+model ClientPhone {
+  id           String        @id @default(cuid())
+  clientId     String
+  phoneNumber  String
+  usesWhatsApp Boolean
+  type         PhoneTypeEnum
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  client       Client        @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
+
+model ClientEmail {
+  id            String   @id @default(cuid())
+  clientId      String
+  email         String
+  receivesEmail Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  client        Client   @relation(fields: [clientId], references: [id], onDelete: Cascade)
+}
+
+// NextAuth.js Models
+// NOTE: When using postgresql, mysql or sqlserver,
+// uncomment the @db.Text annotations below
+// @see https://next-auth.js.org/schemas/models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
